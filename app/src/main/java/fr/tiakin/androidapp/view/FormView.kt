@@ -8,13 +8,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import com.ramcosta.composedestinations.result.ResultBackNavigator
 import fr.tiakin.androidapp.R
+import fr.tiakin.androidapp.data.Product
 
 enum class ProductType {
     Consumable,
@@ -24,15 +27,22 @@ enum class ProductType {
 
 @Destination
 @Composable
-fun FormView(navigator: DestinationsNavigator,product: String) {
-    var name by remember { mutableStateOf(product) }
+fun FormView(navigator: DestinationsNavigator, resultBackNavigator: ResultBackNavigator<Product>) {
+    var id by rememberSaveable() { mutableIntStateOf(0) }
+    var name by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var color by remember { mutableStateOf("") }
     var origin by remember { mutableStateOf("") }
     var isFavorite by remember { mutableStateOf(false) }
     var selectedType by remember { mutableStateOf(ProductType.Other) }
+
     var message = "";
     val shouldShowDialog = remember { mutableStateOf(false) }
+
+    fun newId(): Int {
+        id += 1
+        return id
+    }
 
     if (shouldShowDialog.value) {
         MyAlertDialog(shouldShowDialog = shouldShowDialog, message)
@@ -71,11 +81,27 @@ fun FormView(navigator: DestinationsNavigator,product: String) {
             Text("Ajouter aux favoris")
         }
 
+        var selectedImage by remember { mutableStateOf(R.drawable.ic_launcher_background) }
+
+        Image(
+            painter = painterResource(id = selectedImage),
+            contentDescription = "Product Image",
+            modifier = Modifier.size(100.dp)
+        )
+
+        Button(onClick = {
+            selectedImage = R.drawable.ic_launcher_foreground
+        }) {
+            Text("Choisir une image")
+        }
+
 
         Button(onClick = {
             message = "Type: $selectedType\nNom: $name\nDate: $date\nCouleur: $color\nOrigine: $origin\nFavoris: $isFavorite"
             shouldShowDialog.value = true
-            navigator.popBackStack()
+            val prod = Product(newId(), name, date, color, origin, isFavorite, selectedType, selectedImage)
+
+            resultBackNavigator.navigateBack(prod)
         }) {
             Text("Valider")
         }
