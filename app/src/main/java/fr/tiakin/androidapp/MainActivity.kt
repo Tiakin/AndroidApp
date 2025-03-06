@@ -10,7 +10,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -30,11 +34,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.data.ContextCache
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.ramcosta.composedestinations.DestinationsNavHost
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
@@ -43,8 +49,6 @@ import com.ramcosta.composedestinations.result.ResultRecipient
 import fr.tiakin.androidapp.data.Product
 import fr.tiakin.androidapp.destinations.FormViewDestination
 import fr.tiakin.androidapp.ui.theme.AndroidAppTheme
-import fr.tiakin.androidapp.view.ProductType
-import kotlinx.coroutines.currentCoroutineContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,18 +78,29 @@ fun Greeting(navigator: DestinationsNavigator, resultRecipient: ResultRecipient<
     var liste by rememberSaveable {
         mutableStateOf(emptyList<Product>())
     }
-    //val produit = Product(1,"pomme", "","","",true, ProductType.Other)
-    //liste.add(produit);
     resultRecipient.onNavResult {
         if (it is NavResult.Value) {
-            liste = liste + it.value;
+            val newProduct = it.value
+            val existingIndex = liste.indexOfFirst { product -> product.id == newProduct.id }
+
+            liste = if (existingIndex >= 0) {
+                Log.d("MainActivity", "existingIndex")
+                liste.toMutableList().apply {
+                    set(existingIndex, newProduct)
+                }
+            } else {
+                Log.d("MainActivity", "not existingIndex")
+                liste + newProduct
+            }
         }
-        Log.d("MainActivity","updated")
     }
 
+    val scrollState = rememberScrollState()
 
-
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .verticalScroll(scrollState)
+        .padding(16.dp)) {
         var searchQuery by remember { mutableStateOf("") }
 
         TextField(
@@ -97,17 +112,22 @@ fun Greeting(navigator: DestinationsNavigator, resultRecipient: ResultRecipient<
 
         LazyRow {
             items(liste.filter { it.isFavorite }) { product ->
-                Text(product.name)
+                Text(
+                    product.name,
+                    modifier = Modifier.padding(2.dp)
+                )
             }
         }
 
         val filteredProducts = liste.filter {
+            if(searchQuery.isEmpty()) {
+                return@filter true
+            }
             it.name.contains(searchQuery, ignoreCase = true)
         }
-        ListeProduit(produits = liste, onDelete = { product ->
-            liste = liste - product
-        }, onEdit = { product ->
-            Log.d("MainActivity", product.name)
+        ListeProduit(produits = filteredProducts,
+            onDelete = { product -> liste = liste - product },
+            onEdit = { product -> navigator.navigate(FormViewDestination(product))
         })
         Button(onClick = {
             navigator.navigate(FormViewDestination())
@@ -122,7 +142,7 @@ fun Greeting(navigator: DestinationsNavigator, resultRecipient: ResultRecipient<
 fun ListeProduit(produits: List<Product>, onDelete: (Product) -> Unit, onEdit: (Product) -> Unit) {
     Column {
         produits.forEach { product ->
-            MessageRow(product, onDelete, onEdit)
+            MessageRow(product, onEdit , onDelete)
         }
     }
 }
@@ -138,18 +158,32 @@ fun MessageRow(product: Product, onEdit: (Product) -> Unit, onDelete: (Product) 
         .padding(8.dp)
         .combinedClickable(
             onClick = {
-                Toast.makeText(context, "Id: ${product.id} Nom: ${product.name} Date: ${product.date} Couleur: ${product.color} Origine: ${product.origin} Favori: ${product.isFavorite} Type: ${product.imageResId}", Toast.LENGTH_LONG).show()
-                onEdit(product) // Lance la modification
+                Toast.makeText(context, "Id: ${product.id} Nom: ${product.name} Date: ${product.date} Couleur: ${product.color} Origine: ${product.origin} Favori: ${product.isFavorite} Type: ${product.type}", Toast.LENGTH_LONG).show()
+                onEdit(product)
             },
             onLongClick = { onDelete(product) }
         )
     ) {
-        Image(
-            painter = painterResource(id = product.imageResId),
-            contentDescription = "Product Image",
-            modifier = Modifier.size(50.dp)
-        )
-
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .padding(vertical = 8.dp)
+        ) {
+            if (product.imageUri != null) {
+                AsyncImage(
+                    model = product.imageUri,
+                    contentDescription = "photo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_launcher_background),
+                    contentDescription = "image par défaut",
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
         Column(modifier = Modifier.padding(start = 8.dp)) {
             Text(product.name)
         }

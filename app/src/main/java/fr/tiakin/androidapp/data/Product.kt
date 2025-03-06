@@ -12,7 +12,7 @@ data class Product(
     val origin: String,
     val isFavorite: Boolean,
     val type: ProductType,
-    val imageResId: Int = R.drawable.ic_launcher_background
+    val imageUri: String? = null
 )
  : Serializable
 
